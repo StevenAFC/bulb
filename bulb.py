@@ -1,3 +1,4 @@
+from asyncio.windows_events import NULL
 from python_graphql_client import GraphqlClient
 from influxdb import InfluxDBClient
 from configparser import ConfigParser
@@ -6,7 +7,7 @@ import time
 config_object= ConfigParser()
 config_object.read("config.ini")
 
-client = GraphqlClient(endpoint="https://account.bulb.co.uk/graphql")
+client = GraphqlClient(endpoint="https://gr.bulb.co.uk/graphql")
 
 influxdbinfo = config_object["INFLUXDB"]
 
@@ -19,59 +20,86 @@ db = InfluxDBClient(
     )
 
 query = """
-query usagePageData($accountId: Int!) {
-  meterpoints(accountId: $accountId) {
-    readings {
-      ...meterReadingFragment
+query halfHourlyUsageData(
+  $accountId: Int!
+  $fromDttm: String!
+  $toDttm: String!
+) {
+  data: halfHourlyUsageData(
+    accountId: $accountId
+    fromDttm: $fromDttm
+    toDttm: $toDttm
+  ) {
+    date
+    usage {
+      electricity {
+        cost
+        rates {
+          name
+          cost
+          __typename
+        }
+        __typename
+      }
+      gas {
+        cost
+        rates {
+          name
+          cost
+          __typename
+        }
+        __typename
+      }
       __typename
     }
     __typename
   }
 }
-
-fragment meterReadingFragment on MeterReading {
-  cumulative
-  meter
-  register
-  quality
-  readingDate
-  source
-  unit
-  meterRegisterId
-  sequenceType
-  __typename
-}
 """
 
 bulbinfo = config_object["BULB"]
-
-variables = {"accountId" : int(bulbinfo["accountId"])}
 
 headers = {
 "authorization" : bulbinfo['token']
 }
 
-bulbdata = client.execute(query=query, variables=variables, headers=headers)
+def retrieveBulbData(fromDate, toDate):
 
-def write_data(measurement, readings):
-    data = []
+  variables = {
+    "accountId" : int(bulbinfo["accountId"]),
+    "fromDttm":fromDate,
+    "toDttm":toDate
+  }
 
-    for reading in readings:
-        
-        data.append('{measurement} cumulative={cumulative},meter="{meter}",register="{register}",quality="{quality}",source="{source}",unit="{unit}",meterRegisterId={meterRegisterId},sequenceType="{sequenceType}" {timestamp}'.format(
-            measurement=measurement,
-            cumulative=reading['cumulative'], 
-            meter=reading['meter'],
-            register=reading['register'],
-            quality=reading['quality'],
-            source=reading['source'],
-            unit=reading['unit'],
-            meterRegisterId=reading['meterRegisterId'],
-            sequenceType=reading['sequenceType'],
-            timestamp=int(time.mktime(time.strptime(reading['readingDate'], '%Y-%m-%dT%H:%M:%S.000Z')))
-            ))
+  bulbdata = client.execute(query=query, variables=variables, headers=headers)
 
-    db.write_points(data, database="sensors", time_precision='s', protocol='line')
+  data = []
 
-write_data(measurement=influxdbinfo["electricmeasurement"], readings=bulbdata['data']['meterpoints'][0]['readings'])
-write_data(measurement=influxdbinfo["gasmeasurement"], readings=bulbdata['data']['meterpoints'][1]['readings'])
+  print("Found {} records".format(len(bulbdata["data"]["data"])))
+
+  for reading in bulbdata["data"]["data"]:
+
+    if reading['usage']['electricity']['cost'] != None :
+      electricCost = reading['usage']['electricity']['cost']
+      electricStandingCharge=reading['usage']['electricity']['rates'][1]['cost']
+    else :
+      electricCost = NULL
+      electricStandingCharge=NULL
+
+    if reading['usage']['gas']['cost'] != None :
+      gasCost=reading['usage']['gas']['cost'] - reading['usage']['gas']['rates'][1]['cost']
+      gasStandingCharge=reading['usage']['gas']['rates'][1]['cost']
+    else:
+      gasCost=NULL
+      gasStandingCharge=NULL
+
+    data.append('{measurement} electricCost={electricCost},electricStandingCharge={electricStandingCharge},gasCost={gasCost},gasStandingCharge={gasStandingCharge} {timestamp}'.format(
+      measurement=influxdbinfo["measurement"],
+      electricCost=electricCost, 
+      electricStandingCharge=electricStandingCharge,
+      gasCost=gasCost,
+      gasStandingCharge=gasStandingCharge,
+      timestamp=int(time.mktime(time.strptime(reading['date'], '%Y-%m-%dT%H:%M:%S.000Z')))
+      ))
+  
+  db.write_points(data, database="sensors", time_precision='s', protocol='line')
