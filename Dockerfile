@@ -9,6 +9,7 @@ ENV INFLUXDB_DATABASE =
 ENV INFLUXDB_MEASUREMENT = bulb/energyreadings
 ENV BULB_ACCOUNT = 
 ENV BULB_TOKEN = 
+ENV REFRESH_TIME = 900
 
 # Set up virtual environment
 RUN python3 -m venv /opt/venv
