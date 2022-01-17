@@ -11,5 +11,3 @@ services:
       - INFLUXDB_MEASUREMENT=${INFLUXDB_MEASUREMENT}
       - BULB_ACCOUNT=${BULB_ACCOUNT}
       - BULB_TOKEN=${BULB_TOKEN}
-volumes:
-  logvolume01: {}
