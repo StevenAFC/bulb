@@ -20,5 +20,4 @@ RUN . /opt/venv/bin/activate && pip install -r requirements.txt
 # Run the application:
 COPY main.py .
 COPY bulb.py .
-COPY config.ini .
 CMD . /opt/venv/bin/activate && exec python -u main.py
