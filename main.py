@@ -1,11 +1,15 @@
 from datetime import datetime, timedelta
+import sched, time
 import bulb
+import os
 
-##offset = 96
-##maxdays = 500
+s = sched.scheduler(time.time, time.sleep)
 
-##for x in range(offset, maxdays, 6):
-##    bulb.retrieveBulbData((datetime.today() - timedelta(days=x)).strftime('%Y-%m-%dT00:00:00.000Z'), (datetime.today() - timedelta(days=x - 6)).strftime('%Y-%m-%dT00:00:00.000Z'))
+def loop(sc):
+    bulb.retrieveBulbData((datetime.today() - timedelta(days=6)).strftime('%Y-%m-%dT00:00:00.000Z'), datetime.today().strftime('%Y-%m-%dT00:00:00.000Z'))
+    
+    s.enter(900, 1, loop, (sc,))
 
-bulb.retrieveBulbData((datetime.today() - timedelta(days=6)).strftime('%Y-%m-%dT00:00:00.000Z'), datetime.today().strftime('%Y-%m-%dT00:00:00.000Z'))
+s.enter(900, 1, loop, (s,))
 
+s.run()

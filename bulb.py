@@ -1,72 +1,64 @@
-from asyncio.windows_events import NULL
 from python_graphql_client import GraphqlClient
 from influxdb import InfluxDBClient
-from configparser import ConfigParser
 import time
-
-config_object= ConfigParser()
-config_object.read("config.ini")
-
-client = GraphqlClient(endpoint="https://gr.bulb.co.uk/graphql")
-
-influxdbinfo = config_object["INFLUXDB"]
-
-db = InfluxDBClient(
-        host=influxdbinfo["host"],
-        port=influxdbinfo["port"],
-        username=influxdbinfo["username"],
-        password=influxdbinfo["password"],
-        database=influxdbinfo["database"]
-    )
-
-query = """
-query halfHourlyUsageData(
-  $accountId: Int!
-  $fromDttm: String!
-  $toDttm: String!
-) {
-  data: halfHourlyUsageData(
-    accountId: $accountId
-    fromDttm: $fromDttm
-    toDttm: $toDttm
-  ) {
-    date
-    usage {
-      electricity {
-        cost
-        rates {
-          name
-          cost
-          __typename
-        }
-        __typename
-      }
-      gas {
-        cost
-        rates {
-          name
-          cost
-          __typename
-        }
-        __typename
-      }
-      __typename
-    }
-    __typename
-  }
-}
-"""
-
-bulbinfo = config_object["BULB"]
-
-headers = {
-"authorization" : bulbinfo['token']
-}
+import os
 
 def retrieveBulbData(fromDate, toDate):
 
+  query = """
+    query halfHourlyUsageData(
+      $accountId: Int!
+      $fromDttm: String!
+      $toDttm: String!
+    ) {
+      data: halfHourlyUsageData(
+        accountId: $accountId
+        fromDttm: $fromDttm
+        toDttm: $toDttm
+      ) {
+        date
+        usage {
+          electricity {
+            cost
+            rates {
+              name
+              cost
+              __typename
+            }
+            __typename
+          }
+          gas {
+            cost
+            rates {
+              name
+              cost
+              __typename
+            }
+            __typename
+          }
+          __typename
+        }
+        __typename
+      }
+    }
+    """
+
+  client = GraphqlClient(endpoint="https://gr.bulb.co.uk/graphql")
+
+  db = InfluxDBClient(
+    host=os.environ['INFLUXDB_HOST'],
+    port=os.environ['INFLUXDB_PORT'],
+    username=os.environ['INFLUXDB_USERNAME'],
+    password=os.environ['INFLUXDB_PASSWORD'],
+    database=os.environ['INFLUXDB_DATABASE']
+  )
+
+  headers = {
+    "authorization" : os.environ['BULB_TOKEN']
+  }
+
   variables = {
-    "accountId" : int(bulbinfo["accountId"]),
+    "accountId" : int(os.environ['BULB_ACCOUNT']),
     "fromDttm":fromDate,
     "toDttm":toDate
   }
@@ -83,18 +75,18 @@ def retrieveBulbData(fromDate, toDate):
       electricCost = reading['usage']['electricity']['cost']
       electricStandingCharge=reading['usage']['electricity']['rates'][1]['cost']
     else :
-      electricCost = NULL
-      electricStandingCharge=NULL
+      electricCost = 0
+      electricStandingCharge=0
 
     if reading['usage']['gas']['cost'] != None :
       gasCost=reading['usage']['gas']['cost'] - reading['usage']['gas']['rates'][1]['cost']
       gasStandingCharge=reading['usage']['gas']['rates'][1]['cost']
     else:
-      gasCost=NULL
-      gasStandingCharge=NULL
+      gasCost= 0
+      gasStandingCharge= 0
 
     data.append('{measurement} electricCost={electricCost},electricStandingCharge={electricStandingCharge},gasCost={gasCost},gasStandingCharge={gasStandingCharge} {timestamp}'.format(
-      measurement=influxdbinfo["measurement"],
+      measurement=os.environ['INFLUXDB_MEASUREMENT'],
       electricCost=electricCost, 
       electricStandingCharge=electricStandingCharge,
       gasCost=gasCost,

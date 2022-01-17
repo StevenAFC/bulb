@@ -1,4 +1,6 @@
 config.ini
 output.txt
 venv/
+__pycache__
 otherqueries.txt
+.env
