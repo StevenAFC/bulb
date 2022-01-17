@@ -4,7 +4,7 @@ import bulb
 import os
 
 s = sched.scheduler(time.time, time.sleep)
-rt = os.environ['REFRESH_TIME']
+rt = int(os.environ['REFRESH_TIME'])
 
 print ("Bulb data gathering started, refreshing every {} seconds".format(rt))
 
