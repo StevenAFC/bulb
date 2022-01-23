@@ -1,97 +1,132 @@
 from python_graphql_client import GraphqlClient
-from influxdb import InfluxDBClient
-import time
-import os
 
-def retrieveBulbData(fromDate, toDate):
+class Bulb:
 
-  query = """
-    query halfHourlyUsageData(
-      $accountId: Int!
-      $fromDttm: String!
-      $toDttm: String!
-    ) {
-      data: halfHourlyUsageData(
-        accountId: $accountId
-        fromDttm: $fromDttm
-        toDttm: $toDttm
-      ) {
-        date
-        usage {
-          electricity {
-            cost
-            rates {
-              name
-              cost
-              __typename
-            }
+  def __init__(self, username, password, account) -> None:
+    self.username = username
+    self.password = password
+    self.account = account
+    self.token = ""
+
+  def getToken(self):
+    query = """
+      mutation login($username: String!, $password: String!, $accountId: Int) {
+        login(
+          username: $username
+          password: $password
+          loginOptions: { useBulbAuth: true }
+        ) {
+          errorMessage
+          errorType
+          details {
+            accessToken
+            expiresIn
+            scope
+            idToken
+            tokenType
             __typename
           }
-          gas {
-            cost
-            rates {
-              name
+          config {
+            ...configFragment
+            __typename
+          }
+          __typename
+        }
+      }
+      fragment configFragment on Config {
+        ...featureTogglesFragment
+        __typename
+      }
+      fragment featureTogglesFragment on Config {
+        featureToggles(
+          names: [
+          ]
+          accountId: $accountId
+        ) {
+          __typename
+        }
+        __typename
+      }
+      """
+
+    variables = {
+      "username" : self.username,
+      "password":self.password,
+    }
+
+    client = GraphqlClient(endpoint="https://account.bulb.co.uk/graphql")
+
+    bulbdata = client.execute(query=query, variables=variables)
+
+    self.token = bulbdata["data"]["login"]["details"]["idToken"]
+
+  def retrieveBulbData(self, fromDate, toDate):
+
+    if self.token == "":
+      self.getToken()
+
+    query = """
+      query halfHourlyUsageData(
+        $accountId: Int!
+        $fromDttm: String!
+        $toDttm: String!
+      ) {
+        data: halfHourlyUsageData(
+          accountId: $accountId
+          fromDttm: $fromDttm
+          toDttm: $toDttm
+        ) {
+          date
+          usage {
+            electricity {
               cost
+              rates {
+                name
+                cost
+                __typename
+              }
+              __typename
+            }
+            gas {
+              cost
+              rates {
+                name
+                cost
+                __typename
+              }
               __typename
             }
             __typename
           }
           __typename
         }
-        __typename
       }
+      """
+    variables = {
+      "username" : self.account,
+      "password":fromDate,
+      "toDttm":toDate
     }
-    """
 
-  client = GraphqlClient(endpoint="https://gr.bulb.co.uk/graphql")
+    client = GraphqlClient(endpoint="https://gr.bulb.co.uk/graphql")
 
-  db = InfluxDBClient(
-    host=os.environ['INFLUXDB_HOST'],
-    port=os.environ['INFLUXDB_PORT'],
-    username=os.environ['INFLUXDB_USERNAME'],
-    password=os.environ['INFLUXDB_PASSWORD'],
-    database=os.environ['INFLUXDB_DATABASE']
-  )
+    headers = {
+      "authorization" : "Bearer " + self.token
+    }
 
-  headers = {
-    "authorization" : os.environ['BULB_TOKEN']
-  }
+    variables = {
+      "accountId" : self.account,
+      "fromDttm":fromDate,
+      "toDttm":toDate
+    }
 
-  variables = {
-    "accountId" : int(os.environ['BULB_ACCOUNT']),
-    "fromDttm":fromDate,
-    "toDttm":toDate
-  }
+    bulbdata = client.execute(query=query, variables=variables, headers=headers)
 
-  bulbdata = client.execute(query=query, variables=variables, headers=headers)
+    if "errors" in bulbdata:
+      print("Error: {}".format(bulbdata["errors"][0]["message"]))
+      self.getToken()
+      bulbdata = client.execute(query=query, variables=variables, headers=headers)
+    
+    print("Found {} records".format(len(bulbdata["data"]["data"])))
 
-  data = []
-
-  print("Found {} records".format(len(bulbdata["data"]["data"])))
-
-  for reading in bulbdata["data"]["data"]:
-
-    if reading['usage']['electricity']['cost'] != None :
-      electricCost = reading['usage']['electricity']['cost']
-      electricStandingCharge=reading['usage']['electricity']['rates'][1]['cost']
-    else :
-      electricCost = 0
-      electricStandingCharge=0
-
-    if reading['usage']['gas']['cost'] != None :
-      gasCost=reading['usage']['gas']['cost'] - reading['usage']['gas']['rates'][1]['cost']
-      gasStandingCharge=reading['usage']['gas']['rates'][1]['cost']
-    else:
-      gasCost= 0
-      gasStandingCharge= 0
-
-    data.append('{measurement} electricCost={electricCost},electricStandingCharge={electricStandingCharge},gasCost={gasCost},gasStandingCharge={gasStandingCharge} {timestamp}'.format(
-      measurement=os.environ['INFLUXDB_MEASUREMENT'],
-      electricCost=electricCost, 
-      electricStandingCharge=electricStandingCharge,
-      gasCost=gasCost,
-      gasStandingCharge=gasStandingCharge,
-      timestamp=int(time.mktime(time.strptime(reading['date'], '%Y-%m-%dT%H:%M:%S.000Z')))
-      ))
-  
-  db.write_points(data, database="sensors", time_precision='s', protocol='line')
+    return bulbdata["data"]["data"]
