@@ -14,7 +14,7 @@ class Db:
 
   def insert(self, data, database, measurement):
 
-    data = []
+    output = []
 
     for reading in data:
 
@@ -32,13 +32,14 @@ class Db:
         gasCost= 0
         gasStandingCharge= 0
 
-      data.append('{measurement} electricCost={electricCost},electricStandingCharge={electricStandingCharge},gasCost={gasCost},gasStandingCharge={gasStandingCharge} {timestamp}'.format(
+      output.append('{measurement} electricCost={electricCost},electricStandingCharge={electricStandingCharge},gasCost={gasCost},gasStandingCharge={gasStandingCharge} {timestamp}'.format(
         measurement=measurement,
         electricCost=electricCost, 
         electricStandingCharge=electricStandingCharge,
         gasCost=gasCost,
         gasStandingCharge=gasStandingCharge,
         timestamp=int(time.mktime(time.strptime(reading['date'], '%Y-%m-%dT%H:%M:%S.000Z')))
-        ))
+      ))
 
-    self.db.write_points(data, database=database, time_precision='s', protocol='line')
+      
+    self.db.write_points(output, database=database, time_precision='s', protocol='line')
