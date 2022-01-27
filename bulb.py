@@ -7,8 +7,9 @@ class Bulb:
     self.password = password
     self.account = account
     self.token = ""
+    self.errorCount = 0
 
-  def getToken(self):
+  def setToken(self):
     query = """
       mutation login($username: String!, $password: String!, $accountId: Int) {
         login(
@@ -63,7 +64,7 @@ class Bulb:
   def retrieveBulbData(self, fromDate, toDate):
 
     if self.token == "":
-      self.getToken()
+      self.setToken()
 
     query = """
       query halfHourlyUsageData(
@@ -123,10 +124,14 @@ class Bulb:
     bulbdata = client.execute(query=query, variables=variables, headers=headers)
 
     if "errors" in bulbdata:
-      print("Error: {}".format(bulbdata["errors"][0]["message"]))
-      self.getToken()
-      bulbdata = client.execute(query=query, variables=variables, headers=headers)
-    
-    print("Found {} records".format(len(bulbdata["data"]["data"])))
-
-    return bulbdata["data"]["data"]
+      print("Error - retrieving Bulb data: {}".format(bulbdata["errors"][0]["message"]))
+      self.setToken()
+      self.errorCount += 1
+      self.retrieveBulbData(fromDate, toDate)
+      if self.errorCount >= 3:
+        print("Error - retrieving Bulb data: Failed to retrieve data from Bulb after 3 attempts in a row")
+        return False
+    else:
+      self.errorCount = 0
+      print("Found {} records".format(len(bulbdata["data"]["data"])))
+      return bulbdata["data"]["data"]

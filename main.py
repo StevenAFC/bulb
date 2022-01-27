@@ -18,7 +18,8 @@ print ("Bulb data gathering started, refreshing every {} seconds".format(rt))
 def loop(sc):
     data = bulb.retrieveBulbData((datetime.today() - timedelta(days=6)).strftime('%Y-%m-%dT00:00:00.000Z'), (datetime.today() + timedelta(days=1)).strftime('%Y-%m-%dT00:00:00.000Z'))
     
-    db.insert(data, os.environ['INFLUXDB_DATABASE'], os.environ['INFLUXDB_MEASUREMENT'])
+    if data:
+        db.insert(data, os.environ['INFLUXDB_DATABASE'], os.environ['INFLUXDB_MEASUREMENT'])
 
     s.enter(rt, 1, loop, (sc,))
 
