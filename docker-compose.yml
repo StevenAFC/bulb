@@ -1,6 +1,7 @@
 version: "3.9"
 services:
   bulb:
+    restart: always
     build: .
     environment:
       - INFLUXDB_HOST=${INFLUXDB_HOST}
