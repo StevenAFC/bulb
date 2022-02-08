@@ -1,4 +1,3 @@
-from asyncio.windows_events import NULL
 from python_graphql_client import GraphqlClient
 
 class Bulb:
@@ -57,7 +56,7 @@ class Bulb:
     }
 
     try:
-      client = GraphqlClient(endpoint="https://account.bulddddddddddddddddddddddb.co.uk/graphql")
+      client = GraphqlClient(endpoint="https://account.bulb.co.uk/graphql")
       bulbdata = client.execute(query=query, variables=variables)
 
       self.token = bulbdata["data"]["login"]["details"]["idToken"]
@@ -114,7 +113,7 @@ class Bulb:
       "toDttm":toDate
     }
 
-    client = GraphqlClient(endpoint="https://gr.bulddddddddddddddddddb.co.uk/graphql")
+    client = GraphqlClient(endpoint="https://gr.bulb.co.uk/graphql")
 
     headers = {
       "authorization" : "Bearer " + self.token
