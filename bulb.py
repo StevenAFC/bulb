@@ -125,7 +125,7 @@ class Bulb:
       "toDttm":toDate
     }
 
-    bulbdata = NULL
+    bulbdata = None
     try:
       bulbdata = client.execute(query=query, variables=variables, headers=headers)
     except:
