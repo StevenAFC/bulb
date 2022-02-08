@@ -1,3 +1,4 @@
+from asyncio.windows_events import NULL
 from python_graphql_client import GraphqlClient
 
 class Bulb:
@@ -55,17 +56,21 @@ class Bulb:
       "password":self.password,
     }
 
-    client = GraphqlClient(endpoint="https://account.bulb.co.uk/graphql")
+    try:
+      client = GraphqlClient(endpoint="https://account.bulddddddddddddddddddddddb.co.uk/graphql")
+      bulbdata = client.execute(query=query, variables=variables)
 
-    bulbdata = client.execute(query=query, variables=variables)
+      self.token = bulbdata["data"]["login"]["details"]["idToken"]
+    except:
+      print("Unable to connect to Bulb to retrieve token")
 
-    self.token = bulbdata["data"]["login"]["details"]["idToken"]
+
 
   def retrieveBulbData(self, fromDate, toDate):
 
     if self.token == "":
       self.setToken()
-
+      
     query = """
       query halfHourlyUsageData(
         $accountId: Int!
@@ -109,7 +114,7 @@ class Bulb:
       "toDttm":toDate
     }
 
-    client = GraphqlClient(endpoint="https://gr.bulb.co.uk/graphql")
+    client = GraphqlClient(endpoint="https://gr.bulddddddddddddddddddb.co.uk/graphql")
 
     headers = {
       "authorization" : "Bearer " + self.token
@@ -121,17 +126,22 @@ class Bulb:
       "toDttm":toDate
     }
 
-    bulbdata = client.execute(query=query, variables=variables, headers=headers)
-
-    if "errors" in bulbdata:
-      print("Error - retrieving Bulb data: {}".format(bulbdata["errors"][0]["message"]))
-      self.setToken()
-      self.errorCount += 1
-      self.retrieveBulbData(fromDate, toDate)
-      if self.errorCount >= 3:
-        print("Error - retrieving Bulb data: Failed to retrieve data from Bulb after 3 attempts in a row")
-        return False
-    else:
-      self.errorCount = 0
-      print("Found {} records".format(len(bulbdata["data"]["data"])))
-      return bulbdata["data"]["data"]
+    bulbdata = NULL
+    try:
+      bulbdata = client.execute(query=query, variables=variables, headers=headers)
+    except:
+      print("Unable to connect to Bulb to retrieve data")
+      
+    if bulbdata:
+      if "errors" in bulbdata:
+        print("Error - retrieving Bulb data: {}".format(bulbdata["errors"][0]["message"]))
+        self.setToken()
+        self.errorCount += 1
+        self.retrieveBulbData(fromDate, toDate)
+        if self.errorCount >= 3:
+          print("Error - retrieving Bulb data: Failed to retrieve data from Bulb after 3 attempts in a row")
+          return False
+      else:
+        self.errorCount = 0
+        print("Found {} records".format(len(bulbdata["data"]["data"])))
+        return bulbdata["data"]["data"]
